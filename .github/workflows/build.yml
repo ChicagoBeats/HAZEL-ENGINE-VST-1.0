@@ -1,0 +1,58 @@
+name: Build VST3
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      toolset:
+        description: "Optional MSVC toolset, e.g. v142 (leave empty for default)"
+        required: false
+        default: ""
+
+jobs:
+  core-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build and run engine test
+        run: |
+          g++ -O2 -std=c++17 -Wall -Wextra tests/test_core.cpp -o core_test
+          ./core_test Assets/Samples/
+
+  windows:
+    needs: core-test
+    runs-on: windows-2022
+    strategy:
+      fail-fast: false
+      matrix:
+        arch: [x64, Win32]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure
+        shell: pwsh
+        run: |
+          $ts = "${{ github.event.inputs.toolset }}"
+          if ($ts) { cmake -B build -G "Visual Studio 17 2022" -A ${{ matrix.arch }} -T $ts }
+          else     { cmake -B build -G "Visual Studio 17 2022" -A ${{ matrix.arch }} }
+
+      - name: Build
+        run: cmake --build build --config Release --parallel
+
+      - name: Windows 7/8 compatibility scan
+        shell: pwsh
+        run: python scripts/check_win7_imports.py build/F1nzEngine_artefacts/Release | Tee-Object -FilePath compat_report.txt
+
+      - name: Collect output
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path dist | Out-Null
+          Copy-Item -Recurse build/F1nzEngine_artefacts/Release/VST3 dist/VST3
+          Copy-Item -Recurse build/F1nzEngine_artefacts/Release/Standalone dist/Standalone
+          Copy-Item compat_report.txt dist/
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: F1nzEngine-${{ matrix.arch }}
+          path: dist
