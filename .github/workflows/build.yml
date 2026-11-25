@@ -15,10 +15,22 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Build and run engine test
+      - name: Build and run all tests (engine, Stage Kit, drivetrain/pedal, sampler)
         run: |
-          g++ -O2 -std=c++17 -Wall -Wextra tests/test_core.cpp -o core_test
-          ./core_test Assets/Samples/
+          for t in test_core test_drive test_sampler; do
+            g++ -O2 -std=c++17 -Wall -Wextra tests/$t.cpp -o $t
+          done
+          ./test_core Assets/Samples/
+          ./test_drive
+          ./test_sampler
+      - name: Render Stage Kit demo WAVs
+        run: |
+          g++ -O2 -std=c++17 tests/render_demos.cpp -o render_demos
+          mkdir -p demos && ./render_demos Assets/Samples/ demos
+      - uses: actions/upload-artifact@v4
+        with:
+          name: StageKit-demo-WAVs
+          path: demos
 
   windows:
     needs: core-test
