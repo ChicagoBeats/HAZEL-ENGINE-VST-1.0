@@ -1,0 +1,6 @@
+build/
+dist/
+*.user
+.vs/
+core_test
+demo_*.wav
